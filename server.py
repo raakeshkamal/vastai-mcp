@@ -5,6 +5,7 @@ import json
 import os
 import re
 import logging
+from pathlib import Path
 import paramiko
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
@@ -23,6 +24,23 @@ logger = logging.getLogger("VastMCPServer")
 
 # Default configuration
 DEFAULT_SERVER_URL = "https://console.vast.ai"
+
+
+def _load_env_file():
+    """Load .env file from project directory."""
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                key, value = key.strip(), value.strip()
+                if key and key not in os.environ:
+                    os.environ[key] = value
+
+
+# Load env file before reading config
+_load_env_file()
 
 VAST_API_KEY = os.getenv("VAST_API_KEY")
 SSH_KEY_FILE = (
@@ -563,7 +581,7 @@ def _connect_ssh(
 # Create the MCP server
 mcp = FastMCP(
     "VastAI",
-    description="Vast.ai GPU cloud platform integration through the Model Context Protocol",
+    instructions="Vast.ai GPU cloud platform integration through the Model Context Protocol",
     lifespan=server_lifespan,
 )
 
@@ -1858,19 +1876,9 @@ def main():
 
         import argparse
 
-        parser = argparse.ArgumentParser(description="Vast.ai MCP Server")
-        parser.add_argument(
-            "--port", type=int, default=8000, help="Port to run the server on"
-        )
-        parser.add_argument(
-            "--host", type=str, default="localhost", help="Host to run the server on"
-        )
+        logger.info("Starting Vast.ai MCP server")
 
-        args = parser.parse_args()
-
-        logger.info(f"Starting Vast.ai MCP server on {args.host}:{args.port}")
-
-        mcp.run(transport="sse", host=args.host, port=args.port)
+        mcp.run()
     except Exception as e:
         logger.error(f"Failed to start MCP server: {str(e)}")
         raise
